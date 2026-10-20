@@ -329,7 +329,7 @@
 
   <!-- Main Module with Transformers.js AI Pipeline + Multi-Plane WebGL2 Engine -->
   <script type="module">
-    import { pipeline, env, RawImage } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.3.3';
+    import { pipeline, AutoModel, AutoProcessor, env, RawImage } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.3.3';
 
     env.allowLocalModels = false;
 
@@ -344,7 +344,8 @@
     const aiPercent = document.getElementById('aiPercent');
 
     let depthEstimator = null;
-    let segmenter = null;
+    let mattingModel = null;
+    let mattingProcessor = null;
     let currentImageURL = 'https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&w=1200&q=85';
 
     // Offscreen canvases for 4 essential planes:
@@ -584,34 +585,39 @@
 
         // Initialize AI Models if not yet loaded
         if (!depthEstimator) {
-          setAIStatus('Mengunduh Model AI 1/2: Depth-Anything-V2-Small (3D Depth Estimation)...', 25, true);
+          setAIStatus('Mengunduh Model AI 1/2: Depth-Anything-V2-Small (3D Depth Estimation)...', 20, true);
           depthEstimator = await pipeline('depth-estimation', 'onnx-community/depth-anything-v2-small', {
             dtype: 'q8',
             progress_callback: (info) => {
               if (info.status === 'progress' && info.progress) {
-                setAIStatus(`Mengunduh AI Depth-Anything-V2 (${info.file})...`, 15 + info.progress * 0.35, true);
+                setAIStatus(`Mengunduh AI Depth-Anything-V2 (${info.file})...`, 12 + info.progress * 0.35, true);
               }
             }
           });
         }
 
-        if (!segmenter) {
-          setAIStatus('Mengunduh Model AI 2/2: RMBG-1.4 (High-Precision Hair & Subject Matting)...', 55, true);
-          segmenter = await pipeline('image-segmentation', 'briaai/RMBG-1.4', {
+        if (!mattingModel || !mattingProcessor) {
+          setAIStatus('Mengunduh Model AI 2/2: Portrait & Hair Alpha Matting (MODNet / RMBG)...', 52, true);
+          const MATTING_ID = 'Xenova/modnet';
+          mattingProcessor = await AutoProcessor.from_pretrained(MATTING_ID);
+          mattingModel = await AutoModel.from_pretrained(MATTING_ID, {
+            dtype: 'fp32',
             progress_callback: (info) => {
               if (info.status === 'progress' && info.progress) {
-                setAIStatus(`Mengunduh AI Subject Matting (${info.file})...`, 50 + info.progress * 0.35, true);
+                setAIStatus(`Mengunduh AI Portrait Hair Matting (${info.file})...`, 50 + info.progress * 0.35, true);
               }
             }
           });
         }
 
-        setAIStatus('Menganalisis Peta Kedalaman 3D (Depth Anything V2)...', 88, true);
-        const depthResult = await depthEstimator(imageUrl);
+        setAIStatus('Menganalisis Peta Kedalaman 3D (Depth Anything V2)...', 86, true);
+        const rawImg = await RawImage.fromURL(imageUrl);
+        const depthResult = await depthEstimator(rawImg);
 
-        setAIStatus('Memisahkan Subjek & Helai Rambut (RMBG-1.4 Alpha Matting)...', 94, true);
-        const segResult = await segmenter(imageUrl);
-        const segMask = Array.isArray(segResult) ? segResult[0].mask : segResult.mask;
+        setAIStatus('Memisahkan Subjek & Helai Rambut (MODNet Portrait Alpha Matting)...', 93, true);
+        const { pixel_values } = await mattingProcessor(rawImg);
+        const { output } = await mattingModel({ input: pixel_values });
+        const segMask = await RawImage.fromTensor(output[0].mul(255).to('uint8')).resize(rawImg.width, rawImg.height);
 
         setAIStatus('Melakukan Inpainting Latar Belakang & Mengaktifkan Optik Lensa...', 98, true);
         refineMaskAndPack(W, H, origImageData, depthResult.depth, segMask);
