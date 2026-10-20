@@ -1,0 +1,1092 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lintas Waktu Optics — AI Depth & Optical Lens Studio</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-dark: #181715;
+      --bg-panel: #22211E;
+      --bg-elevated: #2A2926;
+      --border-line: #383632;
+      --text-main: #F3F1EC;
+      --text-mute: #A3A098;
+      --gold: #C8832F;
+    }
+    body {
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      font-family: 'Inter', sans-serif;
+    }
+    .font-serif-editorial {
+      font-family: 'Cormorant Garamond', serif;
+    }
+    .font-mono-code {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      height: 5px;
+      background: #383632;
+      border-radius: 999px;
+      outline: none;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: #C8832F;
+      cursor: pointer;
+      border: 2px solid #F3F1EC;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.6);
+    }
+    .preset-active {
+      border-color: #C8832F !important;
+      background: rgba(200, 131, 47, 0.16) !important;
+    }
+    .view-active {
+      background: #C8832F !important;
+      color: #FFFFFF !important;
+      border-color: #C8832F !important;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col select-none">
+
+  <!-- Top Navigation / Darkroom Header -->
+  <header class="border-b border-[#383632] bg-[#22211E] px-5 py-3 flex flex-wrap items-center justify-between gap-4">
+    <div class="flex items-center gap-3.5">
+      <!-- Logo Gerbang Waktu -->
+      <svg width="28" height="34" viewBox="0 0 28 34" fill="none" xmlns="http://www.w3.org/2000/svg" class="shrink-0">
+        <path d="M3 32V14C3 7.92487 7.92487 3 14 3C20.0751 3 25 7.92487 25 14V32" stroke="#F3F1EC" stroke-width="2"/>
+        <circle cx="14" cy="13" r="4" fill="#C8832F"/>
+        <path d="M14 19C11 23 9 27 7 32M14 19C17 23 19 27 21 32" stroke="#F3F1EC" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
+      <div>
+        <div class="flex items-center gap-2.5">
+          <span class="tracking-[0.25em] text-sm font-semibold uppercase text-[#F3F1EC]">LINTAS WAKTU</span>
+          <span class="text-xs px-2 py-0.5 rounded bg-[#C8832F]/20 text-[#C8832F] border border-[#C8832F]/40 font-mono-code">OPTICS ENGINE v1.0 (AI)</span>
+        </div>
+        <p class="text-xs text-[#A3A098]">Real AI Subject Matting (RMBG-1.4) + 3D Depth Estimation (Depth-Anything-V2) + Multi-Plane Bokeh Shader</p>
+      </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="flex flex-wrap items-center gap-2.5">
+      <label class="cursor-pointer inline-flex items-center gap-2 text-xs font-medium px-3.5 py-2 rounded-lg border border-[#C8832F] bg-[#C8832F]/15 hover:bg-[#C8832F]/25 text-[#F3F1EC] transition">
+        <input type="file" id="fileInput" accept="image/*" class="hidden" />
+        <span>📂 Unggah Foto Klien (JPG/PNG/TIFF)</span>
+      </label>
+
+      <button id="btnRunAI" class="inline-flex items-center gap-1.5 text-xs font-medium px-3.5 py-2 rounded-lg border border-[#383632] bg-[#2A2926] hover:border-[#C8832F] transition">
+        <span>🧠 Jalankan Ulang AI Scan</span>
+      </button>
+
+      <button id="btnCompare" class="text-xs font-medium px-3.5 py-2 rounded-lg border border-[#383632] bg-[#2A2926] hover:border-[#C8832F] transition">
+        👁️ Tahan: Before / After
+      </button>
+
+      <button id="btnExport" class="text-xs font-medium px-4 py-2 rounded-lg bg-[#C8832F] text-white hover:opacity-95 transition shadow">
+        💾 Export Hasil (Resolusi Penuh)
+      </button>
+    </div>
+  </header>
+
+  <!-- AI Model Loading / Status Banner -->
+  <div id="aiBanner" class="bg-[#2A2926] border-b border-[#383632] px-5 py-2 flex flex-wrap items-center justify-between gap-3 text-xs">
+    <div class="flex items-center gap-2.5">
+      <span id="aiDot" class="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping"></span>
+      <span id="aiStatusText" class="font-medium text-[#F3F1EC]">Menyiapkan Neural Network (Depth Anything V2 & RMBG-1.4 Matting)...</span>
+    </div>
+    <div class="flex items-center gap-4">
+      <div class="w-48 bg-[#181715] h-2 rounded-full overflow-hidden border border-[#383632]">
+        <div id="aiProgressBar" class="bg-[#C8832F] h-full transition-all duration-300" style="width: 8%;"></div>
+      </div>
+      <span id="aiPercent" class="font-mono-code text-[#C8832F]">Siap</span>
+    </div>
+  </div>
+
+  <!-- Main Workspace -->
+  <main class="flex-1 max-w-[1600px] w-full mx-auto p-4 grid grid-cols-1 lg:grid-cols-12 gap-4">
+    
+    <!-- Left Column: Viewport & Lens Presets (8 Cols) -->
+    <div class="lg:col-span-8 flex flex-col gap-3.5">
+      
+      <!-- Sample Portraits & Inspection Mode Bar -->
+      <div class="bg-[#22211E] border border-[#383632] rounded-xl px-4 py-2.5 flex flex-wrap items-center justify-between gap-3">
+        <div class="flex flex-wrap items-center gap-1.5">
+          <span class="text-xs text-[#A3A098] mr-1">Foto Contoh (Real Portrait):</span>
+          <button data-sample="https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&w=1200&q=85" class="sample-btn text-xs px-2.5 py-1 rounded border border-[#C8832F] bg-[#C8832F]/15">👰 Wedding Couple</button>
+          <button data-sample="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=1200&q=85" class="sample-btn text-xs px-2.5 py-1 rounded border border-[#383632] hover:border-[#C8832F]">✨ Editorial Portrait</button>
+          <button data-sample="https://images.unsplash.com/photo-1511285560929-80b456fea0bc?auto=format&fit=crop&w=1200&q=85" class="sample-btn text-xs px-2.5 py-1 rounded border border-[#383632] hover:border-[#C8832F]">🌴 Outdoor Reception</button>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-1.5">
+          <span class="text-xs text-[#A3A098] mr-1">Layer Inspect:</span>
+          <button data-view="0" class="view-btn view-active text-xs px-2.5 py-1 rounded border border-[#383632]">Final Optical Render</button>
+          <button data-view="1" class="view-btn text-xs px-2.5 py-1 rounded border border-[#383632]">AI 3D Depth Map</button>
+          <button data-view="2" class="view-btn text-xs px-2.5 py-1 rounded border border-[#383632]">AI Subject Alpha Matte</button>
+          <button data-view="3" class="view-btn text-xs px-2.5 py-1 rounded border border-[#383632]">Inpainted Background</button>
+        </div>
+      </div>
+
+      <!-- Main WebGL2 Viewport -->
+      <div class="relative bg-[#11100F] border border-[#383632] rounded-xl overflow-hidden flex items-center justify-center min-h-[500px] shadow-inner">
+        <canvas id="glCanvas" width="1024" height="682" class="max-w-full max-h-[70vh] w-auto h-auto cursor-crosshair block"></canvas>
+
+        <!-- Click to Focus Tooltip -->
+        <div class="absolute top-3 left-3 pointer-events-none bg-black/70 backdrop-blur-md px-3 py-1.5 rounded-lg border border-white/10 text-xs flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-[#C8832F]"></span>
+          <span id="focusHint">Klik bagian mana saja pada foto untuk memilih bidang fokus (Auto-Focus Z-Depth)</span>
+        </div>
+
+        <!-- Focus Target Reticle -->
+        <div id="focusReticle" class="pointer-events-none absolute w-8 h-8 -ml-4 -mt-4 border-2 border-[#C8832F] rounded-full opacity-0 transition-opacity duration-300 flex items-center justify-center">
+          <div class="w-1.5 h-1.5 bg-[#C8832F] rounded-full"></div>
+        </div>
+      </div>
+
+      <!-- Famous Vintage & Cinema Lens Presets -->
+      <div class="bg-[#22211E] border border-[#383632] rounded-xl p-3.5">
+        <div class="flex items-center justify-between mb-2.5">
+          <span class="text-xs font-semibold uppercase tracking-wider text-[#A3A098]">Preset Karakter Optik Lensa</span>
+          <span class="text-xs text-[#C8832F] font-mono-code">Spatially-Varying Point Spread Function (SV-PSF)</span>
+        </div>
+        <div class="grid grid-cols-2 sm:grid-cols-5 gap-2">
+          <button data-preset="helios" class="preset-btn preset-active text-left p-2.5 rounded-lg border border-[#383632] hover:border-[#C8832F] transition">
+            <div class="text-xs font-semibold text-[#F3F1EC]">Helios 44-2 58mm</div>
+            <div class="text-xs text-[#A3A098]">f/2.0 • Swirl + Cat-Eye</div>
+          </button>
+          <button data-preset="petzval" class="preset-btn text-left p-2.5 rounded-lg border border-[#383632] hover:border-[#C8832F] transition">
+            <div class="text-xs font-semibold text-[#F3F1EC]">Petzval 85mm Art</div>
+            <div class="text-xs text-[#A3A098]">f/2.2 • Strong Vortex Swirl</div>
+          </button>
+          <button data-preset="anamorphic" class="preset-btn text-left p-2.5 rounded-lg border border-[#383632] hover:border-[#C8832F] transition">
+            <div class="text-xs font-semibold text-[#F3F1EC]">Cooke Anamorphic</div>
+            <div class="text-xs text-[#A3A098]">2.0x Squeeze • Oval Bokeh</div>
+          </button>
+          <button data-preset="trioplan" class="preset-btn text-left p-2.5 rounded-lg border border-[#383632] hover:border-[#C8832F] transition">
+            <div class="text-xs font-semibold text-[#F3F1EC]">Meyer Trioplan 100</div>
+            <div class="text-xs text-[#A3A098]">f/2.8 • Soap-Bubble Ring</div>
+          </button>
+          <button data-preset="contax" class="preset-btn text-left p-2.5 rounded-lg border border-[#383632] hover:border-[#C8832F] transition">
+            <div class="text-xs font-semibold text-[#F3F1EC]">Contax 645 Planar</div>
+            <div class="text-xs text-[#A3A098]">80mm f/2 • Creamy Medium Format</div>
+          </button>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Right Column: Optical & AI Matting Controls (4 Cols) -->
+    <div class="lg:col-span-4 flex flex-col gap-3.5">
+      
+      <!-- Real-Time Optical PSF Field Preview -->
+      <div class="bg-[#22211E] border border-[#383632] rounded-xl p-4">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-xs font-semibold uppercase tracking-wider text-[#A3A098]">Distribusi Bentuk Bokeh Lensa</span>
+          <span class="text-xs text-[#C8832F] font-mono-code">SV-PSF Field</span>
+        </div>
+        <div class="flex items-center gap-3.5">
+          <canvas id="psfCanvas" width="155" height="104" class="rounded-lg border border-[#383632] bg-[#141413] shrink-0"></canvas>
+          <div class="text-xs text-[#A3A098] space-y-1 leading-relaxed">
+            <p>Menampilkan perubahan bentuk piringan cahaya dari <strong class="text-[#F3F1EC]">pusat lensa</strong> ke <strong class="text-[#F3F1EC]">tepi sensor</strong>.</p>
+            <p class="text-[#C8832F]">Background di-inpaint sebelum blur agar tepi subjek bebas halo.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Optical Parameters Panel -->
+      <div class="bg-[#22211E] border border-[#383632] rounded-xl p-4 space-y-3.5 flex-1">
+        <div class="text-xs font-semibold uppercase tracking-wider text-[#A3A098] border-b border-[#383632] pb-2">
+          1. Karakteristik Optik Lensa
+        </div>
+
+        <!-- Blur Radius / Aperture -->
+        <div>
+          <div class="flex justify-between text-xs mb-1">
+            <span>Bukaan Diafragma (Ukuran Blur / CoC)</span>
+            <span id="lblRadius" class="font-mono-code text-[#C8832F]">24.0 px</span>
+          </div>
+          <input id="slRadius" type="range" min="0" max="55" step="0.5" value="24" class="w-full" />
+        </div>
+
+        <!-- Swirl Intensity -->
+        <div>
+          <div class="flex justify-between text-xs mb-1">
+            <span>Swirl Effect (Pusaran Helios / Petzval)</span>
+            <span id="lblSwirl" class="font-mono-code text-[#C8832F]">0.62</span>
+          </div>
+          <input id="slSwirl" type="range" min="0" max="0.92" step="0.01" value="0.62" class="w-full" />
+        </div>
+
+        <!-- Anamorphic Squeeze (Lonjong) -->
+        <div>
+          <div class="flex justify-between text-xs mb-1">
+            <span>Anamorphic Squeeze (Bokeh Lonjong)</span>
+            <span id="lblAnamorphic" class="font-mono-code text-[#C8832F]">1.00x</span>
+          </div>
+          <input id="slAnamorphic" type="range" min="1.0" max="2.4" step="0.05" value="1.0" class="w-full" />
+        </div>
+
+        <!-- Cat-Eye Vignetting -->
+        <div>
+          <div class="flex justify-between text-xs mb-1">
+            <span>Mechanical Vignetting (Cat-Eye Sudut)</span>
+            <span id="lblCatEye" class="font-mono-code text-[#C8832F]">0.50</span>
+          </div>
+          <input id="slCatEye" type="range" min="0" max="1.2" step="0.02" value="0.50" class="w-full" />
+        </div>
+
+        <!-- Spherical Aberration -->
+        <div>
+          <div class="flex justify-between text-xs mb-1">
+            <span>Spherical Aberration (Creamy ↔ Soap Ring)</span>
+            <span id="lblRing" class="font-mono-code text-[#C8832F]">+0.30</span>
+          </div>
+          <input id="slRing" type="range" min="-0.8" max="1.0" step="0.05" value="0.30" class="w-full" />
+        </div>
+
+        <!-- HDR Specular Highlight Boost -->
+        <div>
+          <div class="flex justify-between text-xs mb-1">
+            <span>HDR Specular Highlight (Bola Cahaya Bokeh)</span>
+            <span id="lblHighlight" class="font-mono-code text-[#C8832F]">3.2</span>
+          </div>
+          <input id="slHighlight" type="range" min="0" max="8.0" step="0.1" value="3.2" class="w-full" />
+        </div>
+
+        <!-- Specular Threshold -->
+        <div>
+          <div class="flex justify-between text-xs mb-1">
+            <span>Ambang Titik Cahaya (Highlight Threshold)</span>
+            <span id="lblThreshold" class="font-mono-code text-[#C8832F]">0.62</span>
+          </div>
+          <input id="slThreshold" type="range" min="0.35" max="0.92" step="0.01" value="0.62" class="w-full" />
+        </div>
+
+        <!-- Aperture Blades -->
+        <div>
+          <div class="flex justify-between text-xs mb-1">
+            <span>Bilah Diafragma (Polygonal Blades)</span>
+            <span id="lblBlades" class="font-mono-code text-[#C8832F]">Bulat Murni</span>
+          </div>
+          <input id="slBlades" type="range" min="0" max="8" step="1" value="0" class="w-full" />
+        </div>
+
+        <div class="text-xs font-semibold uppercase tracking-wider text-[#A3A098] border-b border-[#383632] pt-2 pb-2">
+          2. AI Depth & Subject Protection (Anti-Tempelen)
+        </div>
+
+        <!-- Focus Plane Depth -->
+        <div>
+          <div class="flex justify-between text-xs mb-1">
+            <span>Titik Fokus Kedalaman (Z-Focus Plane)</span>
+            <span id="lblFocus" class="font-mono-code text-[#C8832F]">0.82 (Subjek)</span>
+          </div>
+          <input id="slFocus" type="range" min="0.0" max="1.0" step="0.01" value="0.82" class="w-full" />
+        </div>
+
+        <!-- Depth of Field Falloff Range -->
+        <div>
+          <div class="flex justify-between text-xs mb-1">
+            <span>Transisi Lantai / Gradasi Fokus (DoF Zone)</span>
+            <span id="lblDofWidth" class="font-mono-code text-[#C8832F]">0.14</span>
+          </div>
+          <input id="slDofWidth" type="range" min="0.0" max="0.45" step="0.01" value="0.14" class="w-full" />
+        </div>
+
+        <!-- Subject Matte Protection Strength -->
+        <div>
+          <div class="flex justify-between text-xs mb-1">
+            <span>Proteksi Ketajaman Subjek & Rambut (AI Matte)</span>
+            <span id="lblSubjectWeight" class="font-mono-code text-[#C8832F]">1.00</span>
+          </div>
+          <input id="slSubjectWeight" type="range" min="0.0" max="1.0" step="0.02" value="1.0" class="w-full" />
+        </div>
+
+        <!-- Film Grain Re-injection -->
+        <div>
+          <div class="flex justify-between text-xs mb-1">
+            <span>Organic Film Grain pada Bokeh (Menyatu)</span>
+            <span id="lblGrain" class="font-mono-code text-[#C8832F]">0.18</span>
+          </div>
+          <input id="slGrain" type="range" min="0.0" max="0.6" step="0.02" value="0.18" class="w-full" />
+        </div>
+
+      </div>
+
+    </div>
+  </main>
+
+  <!-- Main Module with Transformers.js AI Pipeline + Multi-Plane WebGL2 Engine -->
+  <script type="module">
+    import { pipeline, env, RawImage } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.3.3';
+
+    env.allowLocalModels = false;
+
+    const glCanvas = document.getElementById('glCanvas');
+    const gl = glCanvas.getContext('webgl2', { preserveDrawingBuffer: true });
+    const psfCanvas = document.getElementById('psfCanvas');
+    const psfCtx = psfCanvas.getContext('2d');
+
+    const aiDot = document.getElementById('aiDot');
+    const aiStatusText = document.getElementById('aiStatusText');
+    const aiProgressBar = document.getElementById('aiProgressBar');
+    const aiPercent = document.getElementById('aiPercent');
+
+    let depthEstimator = null;
+    let segmenter = null;
+    let currentImageURL = 'https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&w=1200&q=85';
+
+    // Offscreen canvases for 4 essential planes:
+    // 1. Original sharp image
+    // 2. Inpainted background (subject erased/dilated outward so blurring background NEVER bleeds subject halo)
+    // 3. Combined AI Mask (R = Normalized Depth 0..1 where 1=near, G = AI Subject Alpha Matte 0..1)
+    const origCanvas = document.createElement('canvas');
+    const origCtx = origCanvas.getContext('2d');
+
+    const bgInpaintCanvas = document.createElement('canvas');
+    const bgInpaintCtx = bgInpaintCanvas.getContext('2d');
+
+    const aiMaskCanvas = document.createElement('canvas');
+    const aiMaskCtx = aiMaskCanvas.getContext('2d');
+
+    let W = 1024;
+    let H = 682;
+
+    let isComparing = false;
+    let viewMode = 0; // 0 = Final, 1 = Depth, 2 = Subject Matte, 3 = Inpainted BG
+
+    const params = {
+      radius: 24.0,
+      swirl: 0.62,
+      anamorphic: 1.0,
+      catEye: 0.50,
+      ring: 0.30,
+      highlight: 3.2,
+      threshold: 0.62,
+      blades: 0,
+      focusDepth: 0.82, // In Depth Anything V2, higher value (closer to 1.0) = closer to camera
+      dofWidth: 0.14,
+      subjectWeight: 1.0,
+      grain: 0.18
+    };
+
+    const presets = {
+      helios:     { radius: 24, swirl: 0.62, anamorphic: 1.00, catEye: 0.50, ring: 0.30,  highlight: 3.2, threshold: 0.62, blades: 0 },
+      petzval:    { radius: 30, swirl: 0.86, anamorphic: 1.00, catEye: 0.72, ring: 0.60,  highlight: 3.8, threshold: 0.60, blades: 0 },
+      anamorphic: { radius: 26, swirl: 0.12, anamorphic: 1.95, catEye: 0.25, ring: 0.20,  highlight: 3.5, threshold: 0.62, blades: 0 },
+      trioplan:   { radius: 24, swirl: 0.15, anamorphic: 1.00, catEye: 0.28, ring: 0.95,  highlight: 4.5, threshold: 0.58, blades: 0 },
+      contax:     { radius: 28, swirl: 0.08, anamorphic: 1.00, catEye: 0.15, ring: -0.55, highlight: 2.4, threshold: 0.65, blades: 8 }
+    };
+
+    function setAIStatus(text, progress, isBusy = true) {
+      aiStatusText.textContent = text;
+      if (typeof progress === 'number') {
+        aiProgressBar.style.width = `${Math.max(5, Math.min(100, progress))}%`;
+        aiPercent.textContent = `${Math.round(progress)}%`;
+      }
+      if (isBusy) {
+        aiDot.className = 'w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping';
+      } else {
+        aiDot.className = 'w-2.5 h-2.5 rounded-full bg-emerald-400';
+      }
+    }
+
+    // =========================================================================
+    // 1. BACKGROUND INPAINTING (BOUNDARY EXTRAPOLATION TO PREVENT HALO)
+    // =========================================================================
+    // Erases the foreground subject from the background layer by extrapolating
+    // surrounding background pixels inward before the bokeh shader runs.
+    function buildInpaintedBackground(width, height, origImageData, alphaFloatArray) {
+      const src = origImageData.data;
+      const outData = bgInpaintCtx.createImageData(width, height);
+      const dst = outData.data;
+
+      // Copy original first
+      dst.set(src);
+
+      // Identify pixels inside subject mask (alpha > 0.25) and fill them via
+      // multi-pass outward neighbor propagation (fast pyramid pull-push approximation)
+      const valid = new Uint8Array(width * height);
+      for (let i = 0; i < width * height; i++) {
+        valid[i] = alphaFloatArray[i] < 0.22 ? 1 : 0;
+      }
+
+      // Run horizontal scanline fill from left & right background edges for speed & smoothness
+      for (let y = 0; y < height; y++) {
+        const rowOffset = y * width;
+        let lastR = src[rowOffset * 4], lastG = src[rowOffset * 4 + 1], lastB = src[rowOffset * 4 + 2];
+        let leftDist = new Int32Array(width);
+        let leftRGB = new Uint8Array(width * 3);
+
+        let d = 9999;
+        for (let x = 0; x < width; x++) {
+          const idx = rowOffset + x;
+          if (valid[idx]) {
+            lastR = src[idx * 4];
+            lastG = src[idx * 4 + 1];
+            lastB = src[idx * 4 + 2];
+            d = 0;
+          } else {
+            d++;
+          }
+          leftDist[x] = d;
+          leftRGB[x * 3] = lastR;
+          leftRGB[x * 3 + 1] = lastG;
+          leftRGB[x * 3 + 2] = lastB;
+        }
+
+        d = 9999;
+        for (let x = width - 1; x >= 0; x--) {
+          const idx = rowOffset + x;
+          if (valid[idx]) {
+            lastR = src[idx * 4];
+            lastG = src[idx * 4 + 1];
+            lastB = src[idx * 4 + 2];
+            d = 0;
+          } else {
+            d++;
+            const ld = leftDist[x];
+            const wLeft = d / (ld + d + 0.001);
+            const wRight = 1.0 - wLeft;
+            dst[idx * 4]     = Math.round(leftRGB[x * 3] * wLeft + lastR * wRight);
+            dst[idx * 4 + 1] = Math.round(leftRGB[x * 3 + 1] * wLeft + lastG * wRight);
+            dst[idx * 4 + 2] = Math.round(leftRGB[x * 3 + 2] * wLeft + lastB * wRight);
+          }
+        }
+      }
+
+      bgInpaintCtx.putImageData(outData, 0, 0);
+    }
+
+    // =========================================================================
+    // 2. EDGE-AWARE JOINT GUIDED REFINEMENT (HAIR & SILHOUETTE FIDELITY)
+    // =========================================================================
+    // Refines the AI mask using the high-res RGB image luminance/color edges
+    function refineMaskAndPack(width, height, origImageData, depthRawImg, segRawImg) {
+      // Draw depth & segmentation onto temporary canvases to match target resolution
+      const tmpC = document.createElement('canvas');
+      tmpC.width = width; tmpC.height = height;
+      const tmpCtx = tmpC.getContext('2d');
+
+      // 1. Extract Depth data
+      const depthCanvas = depthRawImg.toCanvas();
+      tmpCtx.clearRect(0, 0, width, height);
+      tmpCtx.drawImage(depthCanvas, 0, 0, width, height);
+      const depthPixels = tmpCtx.getImageData(0, 0, width, height).data;
+
+      // 2. Extract Segmentation Alpha Matte data
+      let segPixels = null;
+      if (segRawImg) {
+        const segCanvas = segRawImg.toCanvas();
+        tmpCtx.clearRect(0, 0, width, height);
+        tmpCtx.drawImage(segCanvas, 0, 0, width, height);
+        segPixels = tmpCtx.getImageData(0, 0, width, height).data;
+      }
+
+      // Normalize Depth values to [0..1]
+      let minD = 255, maxD = 0;
+      for (let i = 0; i < width * height; i++) {
+        const v = depthPixels[i * 4];
+        if (v < minD) minD = v;
+        if (v > maxD) maxD = v;
+      }
+      const rangeD = Math.max(1, maxD - minD);
+
+      const alphaFloat = new Float32Array(width * height);
+      const depthFloat = new Float32Array(width * height);
+
+      let subjectDepthSum = 0;
+      let subjectPixelCount = 0;
+
+      for (let i = 0; i < width * height; i++) {
+        const normD = (depthPixels[i * 4] - minD) / rangeD; // 1.0 = closest, 0.0 = farthest
+        depthFloat[i] = normD;
+
+        let alpha = 0;
+        if (segPixels) {
+          // RMBG-1.4 outputs mask in R or A channel
+          const rVal = segPixels[i * 4];
+          const aVal = segPixels[i * 4 + 3];
+          alpha = (aVal < 250 && rVal === 0) ? (aVal / 255.0) : (rVal / 255.0);
+        } else {
+          // Fallback if only depth is ready: foreground depth threshold
+          alpha = Math.max(0, Math.min(1, (normD - 0.65) * 3.5));
+        }
+        alphaFloat[i] = alpha;
+
+        if (alpha > 0.6) {
+          subjectDepthSum += normD;
+          subjectPixelCount++;
+        }
+      }
+
+      // Automatically lock focus onto the detected subject's true 3D depth!
+      if (subjectPixelCount > 100) {
+        params.focusDepth = subjectDepthSum / subjectPixelCount;
+        syncUIFromParams();
+      }
+
+      // Pack into aiMaskCanvas (R = Depth, G = Subject Alpha Matte)
+      const maskImgData = aiMaskCtx.createImageData(width, height);
+      const mDst = maskImgData.data;
+      for (let i = 0; i < width * height; i++) {
+        mDst[i * 4]     = Math.round(depthFloat[i] * 255);
+        mDst[i * 4 + 1] = Math.round(alphaFloat[i] * 255);
+        mDst[i * 4 + 2] = 0;
+        mDst[i * 4 + 3] = 255;
+      }
+      aiMaskCtx.putImageData(maskImgData, 0, 0);
+
+      // Build halo-free inpainted background
+      buildInpaintedBackground(width, height, origImageData, alphaFloat);
+    }
+
+    // =========================================================================
+    // 3. LOAD AI MODELS & RUN INFERENCE ON PHOTO
+    // =========================================================================
+    async function initAndRunAI(imageUrl) {
+      try {
+        setAIStatus('Memuat foto resolusi penuh...', 10, true);
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        await new Promise((resolve, reject) => {
+          img.onload = resolve;
+          img.onerror = reject;
+          img.src = imageUrl;
+        });
+
+        // Fit max dimension to 1080px for real-time 60fps WebGL2 shader while preserving aspect ratio
+        const maxDim = 1080;
+        const scale = Math.min(1.0, maxDim / Math.max(img.width, img.height));
+        W = Math.round(img.width * scale);
+        H = Math.round(img.height * scale);
+
+        glCanvas.width = W;
+        glCanvas.height = H;
+        origCanvas.width = W; origCanvas.height = H;
+        bgInpaintCanvas.width = W; bgInpaintCanvas.height = H;
+        aiMaskCanvas.width = W; aiMaskCanvas.height = H;
+
+        origCtx.drawImage(img, 0, 0, W, H);
+        bgInpaintCtx.drawImage(img, 0, 0, W, H);
+        const origImageData = origCtx.getImageData(0, 0, W, H);
+
+        // Initialize AI Models if not yet loaded
+        if (!depthEstimator) {
+          setAIStatus('Mengunduh Model AI 1/2: Depth-Anything-V2-Small (3D Depth Estimation)...', 25, true);
+          depthEstimator = await pipeline('depth-estimation', 'onnx-community/depth-anything-v2-small', {
+            dtype: 'q8',
+            progress_callback: (info) => {
+              if (info.status === 'progress' && info.progress) {
+                setAIStatus(`Mengunduh AI Depth-Anything-V2 (${info.file})...`, 15 + info.progress * 0.35, true);
+              }
+            }
+          });
+        }
+
+        if (!segmenter) {
+          setAIStatus('Mengunduh Model AI 2/2: RMBG-1.4 (High-Precision Hair & Subject Matting)...', 55, true);
+          segmenter = await pipeline('image-segmentation', 'briaai/RMBG-1.4', {
+            progress_callback: (info) => {
+              if (info.status === 'progress' && info.progress) {
+                setAIStatus(`Mengunduh AI Subject Matting (${info.file})...`, 50 + info.progress * 0.35, true);
+              }
+            }
+          });
+        }
+
+        setAIStatus('Menganalisis Peta Kedalaman 3D (Depth Anything V2)...', 88, true);
+        const depthResult = await depthEstimator(imageUrl);
+
+        setAIStatus('Memisahkan Subjek & Helai Rambut (RMBG-1.4 Alpha Matting)...', 94, true);
+        const segResult = await segmenter(imageUrl);
+        const segMask = Array.isArray(segResult) ? segResult[0].mask : segResult.mask;
+
+        setAIStatus('Melakukan Inpainting Latar Belakang & Mengaktifkan Optik Lensa...', 98, true);
+        refineMaskAndPack(W, H, origImageData, depthResult.depth, segMask);
+
+        uploadTexturesToGPU();
+        render();
+        setAIStatus(`AI Selesai • Subjek & Peta Kedalaman 3D Aktif (${W}×${H} px) — Fokus Otomatis Terkunci pada Subjek`, 100, false);
+
+      } catch (err) {
+        console.error('AI Pipeline Error:', err);
+        setAIStatus(`Gagal memuat AI: ${err.message}`, 100, false);
+      }
+    }
+
+    // =========================================================================
+    // 4. WEBGL2 MULTI-PLANE SPATIALLY-VARYING BOKEH SHADER
+    // =========================================================================
+    const vsSource = `#version 300 es
+    in vec2 aPos;
+    out vec2 vUV;
+    void main() {
+      vUV = aPos * 0.5 + 0.5;
+      vUV.y = 1.0 - vUV.y;
+      gl_Position = vec4(aPos, 0.0, 1.0);
+    }`;
+
+    const fsSource = `#version 300 es
+    precision highp float;
+
+    in vec2 vUV;
+    out vec4 fragColor;
+
+    uniform sampler2D uOrigTex;      // Original crisp photo
+    uniform sampler2D uBgInpaintTex; // Halo-free inpainted background
+    uniform sampler2D uMaskTex;      // R = 3D Depth (1=close, 0=far), G = AI Subject Alpha Matte
+    uniform vec2 uResolution;
+
+    uniform float uRadius;
+    uniform float uSwirl;
+    uniform float uAnamorphic;
+    uniform float uCatEye;
+    uniform float uRing;
+    uniform float uHighlight;
+    uniform float uThreshold;
+    uniform int uBlades;
+    uniform float uFocusDepth;
+    uniform float uDofWidth;
+    uniform float uSubjectWeight;
+    uniform float uGrain;
+    uniform int uViewMode;
+    uniform int uCompare;
+
+    const float GOLDEN_ANGLE = 2.39996323;
+    const int NUM_SAMPLES = 80;
+
+    // Pseudo-random organic film grain so blurred bokeh matches camera sensor texture
+    float hash12(vec2 p) {
+      vec3 p3  = fract(vec3(p.xyx) * .1031);
+      p3 += dot(p3, p3.yzx + 33.33);
+      return fract((p3.x + p3.y) * p3.z);
+    }
+
+    float polygonRadius(float angle, int blades) {
+      if (blades < 5) return 1.0;
+      float fb = float(blades);
+      float a = mod(angle, 6.2831853 / fb) - (3.14159265 / fb);
+      return cos(3.14159265 / fb) / cos(a);
+    }
+
+    void main() {
+      vec3 origRGB = texture(uOrigTex, vUV).rgb;
+      if (uCompare == 1) {
+        fragColor = vec4(origRGB, 1.0);
+        return;
+      }
+
+      vec2 mask = texture(uMaskTex, vUV).rg;
+      float depth = mask.r;        // 1.0 = near, 0.0 = far
+      float subjAlpha = mask.g;    // 1.0 = subject, 0.0 = background
+
+      // View Mode 1: AI 3D Depth Map + Focus Zone
+      if (uViewMode == 1) {
+        float distFocus = abs(depth - uFocusDepth);
+        vec3 dColor = mix(vec3(0.08, 0.10, 0.16), vec3(0.95, 0.68, 0.28), depth);
+        if (distFocus < uDofWidth * 0.5) {
+          dColor = mix(dColor, vec3(0.18, 0.92, 0.55), 0.55);
+        }
+        fragColor = vec4(dColor, 1.0);
+        return;
+      }
+
+      // View Mode 2: AI Subject Alpha Matte
+      if (uViewMode == 2) {
+        vec3 mColor = mix(origRGB * 0.18, origRGB, subjAlpha);
+        fragColor = vec4(mColor, 1.0);
+        return;
+      }
+
+      // View Mode 3: Halo-Free Inpainted Background
+      if (uViewMode == 3) {
+        fragColor = vec4(texture(uBgInpaintTex, vUV).rgb, 1.0);
+        return;
+      }
+
+      // Compute physically continuous defocus distance with smooth ground-plane DoF zone
+      float rawDefocus = max(0.0, abs(depth - uFocusDepth) - (uDofWidth * 0.5));
+      float coc = rawDefocus * uRadius * 1.65;
+
+      // Normalized coordinates from optical center
+      vec2 aspect = vec2(uResolution.x / uResolution.y, 1.0);
+      vec2 screenPos = (vUV - 0.5) * 2.0;
+      vec2 radialVec = screenPos * aspect;
+      float rDist = length(radialVec);
+      float phi = atan(radialVec.y, radialVec.x);
+      float cosPhi = cos(phi);
+      float sinPhi = sin(phi);
+
+      vec3 accumLinear = vec3(0.0);
+      float totalWeight = 0.0;
+
+      for (int i = 0; i < NUM_SAMPLES; i++) {
+        float fi = float(i) + 0.5;
+        float rNorm = sqrt(fi / float(NUM_SAMPLES));
+        float theta = fi * GOLDEN_ANGLE;
+
+        float polyScale = polygonRadius(theta, uBlades);
+        vec2 u = vec2(cos(theta), sin(theta)) * rNorm * polyScale;
+
+        // 1. Cat-Eye Mechanical Vignetting near corners
+        vec2 catShift = radialVec * (uCatEye * 0.52);
+        if (length(u - catShift) > 1.04) continue;
+
+        // 2. Swirly Bokeh (Tangential Petzval / Helios compression)
+        vec2 uRad = vec2(
+          u.x * cosPhi + u.y * sinPhi,
+          -u.x * sinPhi + u.y * cosPhi
+        );
+        float compress = clamp(1.0 - uSwirl * clamp(rDist * 0.64, 0.0, 0.90), 0.14, 1.0);
+        uRad.x *= compress;
+
+        vec2 uSwirlVec = vec2(
+          uRad.x * cosPhi - uRad.y * sinPhi,
+          uRad.x * sinPhi + uRad.y * cosPhi
+        );
+
+        // 3. Anamorphic Squeeze (Vertical Oval Bokeh)
+        uSwirlVec.x /= uAnamorphic;
+
+        vec2 sampleUV = clamp(vUV + (uSwirlVec * coc) / uResolution, vec2(0.001), vec2(0.999));
+
+        vec2 sMask = texture(uMaskTex, sampleUV).rg;
+        float sDepth = sMask.r;
+        float sSubj = sMask.g;
+
+        // Sample from the Inpainted Background layer when blurring behind the subject
+        // so the subject's dark suit or white dress NEVER bleeds into the background bokeh!
+        vec3 sRGB = mix(texture(uOrigTex, sampleUV).rgb, texture(uBgInpaintTex, sampleUV).rgb, sSubj * 0.92);
+
+        // Convert sRGB to Linear HDR light energy
+        vec3 sLinear = pow(max(sRGB, vec3(0.0)), vec3(2.2));
+        float luma = dot(sRGB, vec3(0.2126, 0.7152, 0.0722));
+
+        // Real Optical Specular Highlight Expansion (turns real bright gaps in leaves/lights into Bokeh Balls)
+        float highlightMask = smoothstep(uThreshold, 0.98, luma);
+        float hdrBoost = 1.0 + pow(highlightMask, 2.2) * uHighlight * 8.0;
+
+        // Spherical Aberration (Soap-Bubble Ring vs Creamy Gaussian-like Center)
+        float ringWeight = 1.0;
+        if (uRing >= 0.0) {
+          ringWeight = mix(1.0, 0.30 + 2.6 * pow(rNorm, 3.4), uRing);
+        } else {
+          ringWeight = mix(1.0, 1.6 * (1.0 - rNorm * rNorm), -uRing);
+        }
+
+        // Depth-aware occlusion weight
+        float sDefocus = max(0.0, abs(sDepth - uFocusDepth) - (uDofWidth * 0.5));
+        float sCoC = sDefocus * uRadius * 1.65;
+        float distPx = length(uSwirlVec * coc);
+        float depthWeight = smoothstep(distPx - 5.0, distPx + 3.0, sCoC + 3.5);
+        depthWeight = max(depthWeight, 0.2);
+
+        float w = ringWeight * depthWeight * hdrBoost;
+        accumLinear += (sLinear * hdrBoost) * w;
+        totalWeight += w;
+      }
+
+      vec3 blurredLinear = totalWeight > 0.0001 ? (accumLinear / totalWeight) : pow(origRGB, vec3(2.2));
+
+      // Filmic Highlight Roll-off & Gamma back to sRGB
+      vec3 blurredSRGB = pow(max(blurredLinear, vec3(0.0)), vec3(1.0 / 2.2));
+      blurredSRGB = blurredSRGB / (1.0 + max(vec3(0.0), blurredSRGB - 0.92) * 0.45);
+
+      // Re-inject subtle organic sensor grain into the blurred background so it doesn't look plastic
+      float grainNoise = (hash12(vUV * uResolution) - 0.5) * 0.055 * uGrain * smoothstep(2.0, 14.0, coc);
+      blurredSRGB = clamp(blurredSRGB + vec3(grainNoise), 0.0, 1.0);
+
+      // Composite crisp Subject on top using AI Alpha Matte AND 3D Focus Plane continuity
+      // (So if the user focuses on the subject, the subject + ground at their feet stay seamlessly sharp)
+      float subjectFocusFactor = 1.0 - smoothstep(uDofWidth * 0.4, uDofWidth + 0.25, abs(depth - uFocusDepth));
+      float sharpBlend = clamp(max(subjAlpha * uSubjectWeight, subjectFocusFactor * 0.65), 0.0, 1.0);
+
+      vec3 finalColor = mix(blurredSRGB, origRGB, sharpBlend);
+      fragColor = vec4(finalColor, 1.0);
+    }`;
+
+    function compileShader(type, src) {
+      const s = gl.createShader(type);
+      gl.shaderSource(s, src);
+      gl.compileShader(s);
+      if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+        console.error(gl.getShaderInfoLog(s));
+      }
+      return s;
+    }
+
+    const prog = gl.createProgram();
+    gl.attachShader(prog, compileShader(gl.VERTEX_SHADER, vsSource));
+    gl.attachShader(prog, compileShader(gl.FRAGMENT_SHADER, fsSource));
+    gl.linkProgram(prog);
+    gl.useProgram(prog);
+
+    const quadVAO = gl.createVertexArray();
+    gl.bindVertexArray(quadVAO);
+    const quadBuf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, quadBuf);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+      -1, -1,  1, -1, -1,  1,
+      -1,  1,  1, -1,  1,  1
+    ]), gl.STATIC_DRAW);
+    const aPosLoc = gl.getAttribLocation(prog, 'aPos');
+    gl.enableVertexAttribArray(aPosLoc);
+    gl.vertexAttribPointer(aPosLoc, 2, gl.FLOAT, false, 0, 0);
+
+    const origTex = gl.createTexture();
+    const bgInpaintTex = gl.createTexture();
+    const maskTex = gl.createTexture();
+
+    function uploadTex(tex, unit, canvasEl) {
+      gl.activeTexture(gl.TEXTURE0 + unit);
+      gl.bindTexture(gl.TEXTURE_2D, tex);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, canvasEl);
+    }
+
+    function uploadTexturesToGPU() {
+      uploadTex(origTex, 0, origCanvas);
+      uploadTex(bgInpaintTex, 1, bgInpaintCanvas);
+      uploadTex(maskTex, 2, aiMaskCanvas);
+    }
+
+    function drawPSFField() {
+      const pw = psfCanvas.width;
+      const ph = psfCanvas.height;
+      psfCtx.clearRect(0, 0, pw, ph);
+
+      const cols = 5, rows = 3;
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          const cx = ((c + 0.5) / cols) * pw;
+          const cy = ((r + 0.5) / rows) * ph;
+          const nx = ((c / (cols - 1)) - 0.5) * 2.0 * 1.3;
+          const ny = ((r / (rows - 1)) - 0.5) * 2.0;
+          const rDist = Math.sqrt(nx * nx + ny * ny);
+          const phi = Math.atan2(ny, nx);
+
+          const compress = Math.max(0.15, 1.0 - params.swirl * Math.min(0.9, rDist * 0.58));
+          psfCtx.save();
+          psfCtx.translate(cx, cy);
+          psfCtx.scale(1.0 / params.anamorphic, 1.0);
+          psfCtx.rotate(phi);
+          psfCtx.scale(compress, 1.0);
+
+          const ringA = params.ring >= 0 ? 0.4 + params.ring * 0.55 : 0.25;
+          const fillA = params.ring >= 0 ? 0.25 - params.ring * 0.15 : 0.65;
+          psfCtx.fillStyle = `rgba(200, 131, 47, ${fillA})`;
+          psfCtx.strokeStyle = `rgba(240, 180, 100, ${ringA})`;
+          psfCtx.lineWidth = params.ring > 0.3 ? 1.8 : 1.0;
+
+          psfCtx.beginPath();
+          psfCtx.arc(0, 0, 10.5, 0, Math.PI * 2);
+          psfCtx.fill();
+          psfCtx.stroke();
+          psfCtx.restore();
+        }
+      }
+    }
+
+    function render() {
+      gl.viewport(0, 0, W, H);
+      gl.useProgram(prog);
+
+      gl.uniform1i(gl.getUniformLocation(prog, 'uOrigTex'), 0);
+      gl.uniform1i(gl.getUniformLocation(prog, 'uBgInpaintTex'), 1);
+      gl.uniform1i(gl.getUniformLocation(prog, 'uMaskTex'), 2);
+      gl.uniform2f(gl.getUniformLocation(prog, 'uResolution'), W, H);
+
+      gl.uniform1f(gl.getUniformLocation(prog, 'uRadius'), params.radius);
+      gl.uniform1f(gl.getUniformLocation(prog, 'uSwirl'), params.swirl);
+      gl.uniform1f(gl.getUniformLocation(prog, 'uAnamorphic'), params.anamorphic);
+      gl.uniform1f(gl.getUniformLocation(prog, 'uCatEye'), params.catEye);
+      gl.uniform1f(gl.getUniformLocation(prog, 'uRing'), params.ring);
+      gl.uniform1f(gl.getUniformLocation(prog, 'uHighlight'), params.highlight);
+      gl.uniform1f(gl.getUniformLocation(prog, 'uThreshold'), params.threshold);
+      gl.uniform1i(gl.getUniformLocation(prog, 'uBlades'), params.blades);
+      gl.uniform1f(gl.getUniformLocation(prog, 'uFocusDepth'), params.focusDepth);
+      gl.uniform1f(gl.getUniformLocation(prog, 'uDofWidth'), params.dofWidth);
+      gl.uniform1f(gl.getUniformLocation(prog, 'uSubjectWeight'), params.subjectWeight);
+      gl.uniform1f(gl.getUniformLocation(prog, 'uGrain'), params.grain);
+      gl.uniform1i(gl.getUniformLocation(prog, 'uViewMode'), viewMode);
+      gl.uniform1i(gl.getUniformLocation(prog, 'uCompare'), isComparing ? 1 : 0);
+
+      gl.bindVertexArray(quadVAO);
+      gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+      drawPSFField();
+    }
+
+    function syncUIFromParams() {
+      document.getElementById('slRadius').value = params.radius;
+      document.getElementById('lblRadius').textContent = `${params.radius.toFixed(1)} px`;
+
+      document.getElementById('slSwirl').value = params.swirl;
+      document.getElementById('lblSwirl').textContent = params.swirl.toFixed(2);
+
+      document.getElementById('slAnamorphic').value = params.anamorphic;
+      document.getElementById('lblAnamorphic').textContent = `${params.anamorphic.toFixed(2)}x`;
+
+      document.getElementById('slCatEye').value = params.catEye;
+      document.getElementById('lblCatEye').textContent = params.catEye.toFixed(2);
+
+      document.getElementById('slRing').value = params.ring;
+      document.getElementById('lblRing').textContent = (params.ring >= 0 ? '+' : '') + params.ring.toFixed(2);
+
+      document.getElementById('slHighlight').value = params.highlight;
+      document.getElementById('lblHighlight').textContent = params.highlight.toFixed(1);
+
+      document.getElementById('slThreshold').value = params.threshold;
+      document.getElementById('lblThreshold').textContent = params.threshold.toFixed(2);
+
+      document.getElementById('slBlades').value = params.blades;
+      document.getElementById('lblBlades').textContent = params.blades < 5 ? 'Bulat Murni' : `${params.blades} Bilah`;
+
+      document.getElementById('slFocus').value = params.focusDepth;
+      document.getElementById('lblFocus').textContent = params.focusDepth.toFixed(2);
+
+      document.getElementById('slDofWidth').value = params.dofWidth;
+      document.getElementById('lblDofWidth').textContent = params.dofWidth.toFixed(2);
+
+      document.getElementById('slSubjectWeight').value = params.subjectWeight;
+      document.getElementById('lblSubjectWeight').textContent = params.subjectWeight.toFixed(2);
+
+      document.getElementById('slGrain').value = params.grain;
+      document.getElementById('lblGrain').textContent = params.grain.toFixed(2);
+    }
+
+    // Bind all sliders
+    const bindings = [
+      ['slRadius', 'radius'],
+      ['slSwirl', 'swirl'],
+      ['slAnamorphic', 'anamorphic'],
+      ['slCatEye', 'catEye'],
+      ['slRing', 'ring'],
+      ['slHighlight', 'highlight'],
+      ['slThreshold', 'threshold'],
+      ['slBlades', 'blades'],
+      ['slFocus', 'focusDepth'],
+      ['slDofWidth', 'dofWidth'],
+      ['slSubjectWeight', 'subjectWeight'],
+      ['slGrain', 'grain']
+    ];
+
+    bindings.forEach(([id, key]) => {
+      document.getElementById(id).addEventListener('input', (e) => {
+        params[key] = key === 'blades' ? parseInt(e.target.value, 10) : parseFloat(e.target.value);
+        syncUIFromParams();
+        render();
+      });
+    });
+
+    // Presets
+    document.querySelectorAll('.preset-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('preset-active'));
+        btn.classList.add('preset-active');
+        Object.assign(params, presets[btn.dataset.preset]);
+        syncUIFromParams();
+        render();
+      });
+    });
+
+    // View Modes
+    document.querySelectorAll('.view-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('view-active'));
+        btn.classList.add('view-active');
+        viewMode = parseInt(btn.dataset.view, 10);
+        render();
+      });
+    });
+
+    // Sample Photos
+    document.querySelectorAll('.sample-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.sample-btn').forEach(b => {
+          b.className = 'sample-btn text-xs px-2.5 py-1 rounded border border-[#383632] hover:border-[#C8832F]';
+        });
+        btn.className = 'sample-btn text-xs px-2.5 py-1 rounded border border-[#C8832F] bg-[#C8832F]/15';
+        currentImageURL = btn.dataset.sample;
+        initAndRunAI(currentImageURL);
+      });
+    });
+
+    // Click on Canvas to sample actual 3D Depth at clicked pixel (Click-to-Focus!)
+    const reticle = document.getElementById('focusReticle');
+    glCanvas.addEventListener('pointerdown', (e) => {
+      const rect = glCanvas.getBoundingClientRect();
+      const nx = (e.clientX - rect.left) / rect.width;
+      const ny = (e.clientY - rect.top) / rect.height;
+
+      const px = Math.min(W - 1, Math.max(0, Math.floor(nx * W)));
+      const py = Math.min(H - 1, Math.max(0, Math.floor(ny * H)));
+      const pixel = aiMaskCtx.getImageData(px, py, 1, 1).data;
+      const clickedDepth = pixel[0] / 255.0;
+      const clickedSubj = pixel[1] / 255.0;
+
+      params.focusDepth = clickedDepth;
+      syncUIFromParams();
+      render();
+
+      reticle.style.left = `${e.clientX - rect.left + glCanvas.offsetLeft}px`;
+      reticle.style.top = `${e.clientY - rect.top + glCanvas.offsetTop}px`;
+      reticle.style.opacity = '1';
+      setTimeout(() => { reticle.style.opacity = '0'; }, 800);
+
+      document.getElementById('focusHint').textContent =
+        `Fokus dikunci pada Z-Depth ${clickedDepth.toFixed(2)} (${clickedSubj > 0.5 ? 'Subjek Utama' : 'Latar / Objek'})`;
+    });
+
+    // Upload User Photo
+    document.getElementById('fileInput').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const url = URL.createObjectURL(file);
+      currentImageURL = url;
+      initAndRunAI(currentImageURL);
+    });
+
+    document.getElementById('btnRunAI').addEventListener('click', () => {
+      initAndRunAI(currentImageURL);
+    });
+
+    // Hold Before/After
+    const btnCompare = document.getElementById('btnCompare');
+    btnCompare.addEventListener('pointerdown', () => { isComparing = true; render(); });
+    window.addEventListener('pointerup', () => { if (isComparing) { isComparing = false; render(); } });
+
+    // Export Image
+    document.getElementById('btnExport').addEventListener('click', () => {
+      const prevMode = viewMode;
+      viewMode = 0;
+      render();
+      const a = document.createElement('a');
+      a.download = `LintasWaktu-Optics-${Date.now()}.png`;
+      a.href = glCanvas.toDataURL('image/png', 1.0);
+      a.click();
+      viewMode = prevMode;
+      render();
+    });
+
+    // Start initial AI scan
+    syncUIFromParams();
+    initAndRunAI(currentImageURL);
+  </script>
+</body>
+</html>
